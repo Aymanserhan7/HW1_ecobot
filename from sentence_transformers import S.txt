@@ -1,0 +1,96 @@
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+import pandas as pd
+
+papers = [
+    {
+        "title": "Internet of Things and smart sensors in agriculture: Scopes and applications",
+        "year": "2023",
+        "text": """
+        This paper reviews the use of IoT and smart sensors in agriculture.
+        It explains how sensors can monitor environmental factors such as
+        temperature, humidity, soil moisture and soil composition.
+        These parameters are important for crop growth and environmental monitoring.
+        """
+    },
+    {
+        "title": "A ground robotic system for crops and soil monitoring and targeted intervention",
+        "year": "2024",
+        "text": """
+        This work presents a mobile ground robot for crop and soil monitoring.
+        The robotic platform includes a mobile rover, a robotic arm and sensors
+        for navigation, crop inspection and soil monitoring.
+        It is relevant to robotic ecological and agricultural monitoring.
+        """
+    },
+    {
+        "title": "Internet-of-Things-Based Multiple-Sensor Monitoring System for Soil Information Diagnosis",
+        "year": "2023",
+        "text": """
+        This research presents an IoT-based system using multiple sensors
+        for soil information monitoring and diagnosis. The system collects
+        soil data that can help decision making in agriculture and environmental analysis.
+        """
+    },
+    {
+        "title": "IoT-Based Low-Cost Soil Moisture and Soil Temperature Monitoring System",
+        "year": "2022",
+        "text": """
+        This paper describes a low-cost IoT system for measuring soil moisture
+        and soil temperature. The system uses sensors, a microcontroller,
+        wireless communication and real-time visualization through an application.
+        """
+    },
+    {
+        "title": "Environmental Variable Monitoring with IoT Technology",
+        "year": "2021",
+        "text": """
+        This article describes a flexible low-cost platform for monitoring
+        environmental variables in agriculture using IoT technology.
+        The system collects data from sensors and stores it in a database
+        so users can access information in real time.
+        """
+    }
+]
+
+df = pd.DataFrame(papers)
+df
+
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+texts = df["title"] + ". " + df["text"]
+embeddings = model.encode(texts.tolist())
+
+dimension = embeddings.shape[1]
+index = faiss.IndexFlatL2(dimension)
+index.add(np.array(embeddings).astype("float32"))
+
+print("RAG index is ready. Number of papers:", index.ntotal)
+
+
+def rag_search(query, top_k=3):
+    query_embedding = model.encode([query])
+    distances, indices = index.search(np.array(query_embedding).astype("float32"), top_k)
+
+    results = []
+    for idx in indices[0]:
+        paper = df.iloc[idx]
+        results.append({
+            "title": paper["title"],
+            "year": paper["year"],
+            "summary": paper["text"]
+        })
+    return results
+
+
+question = input("Enter your ecological research question: ")
+
+results = rag_search(question, top_k=3)
+
+print("\nMost relevant academic papers:\n")
+for i, r in enumerate(results, 1):
+    print(f"{i}. {r['title']} ({r['year']})")
+    print(r["summary"])
+    print("-" * 80)
